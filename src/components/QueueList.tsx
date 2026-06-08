@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { QueueItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Loader2, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Loader2, Download, CheckCircle2, AlertCircle, Archive } from 'lucide-react';
 import { formatBytes } from '../lib/image-utils';
+import JSZip from 'jszip';
 
 interface QueueListProps {
   queue: QueueItem[];
@@ -13,13 +14,15 @@ interface QueueListProps {
 }
 
 export function QueueItemCard({ item, onRemove, isConverting }: { item: QueueItem, onRemove: () => void, isConverting: boolean }) {
+  const displayName = item.customName ? `${item.customName} (from ${item.file.name})` : item.file.name;
+  
   return (
     <div className="w-full h-20 border border-zinc-100 rounded-xl flex items-center p-3 gap-4 bg-zinc-50/50 shrink-0">
       <div className="w-14 h-14 bg-zinc-200 rounded-lg overflow-hidden shrink-0 border border-zinc-200">
          <img src={item.previewUrl} alt="preview" className="w-full h-full object-cover" />
       </div>
       <div className="flex-1 min-w-0 flex flex-col justify-center">
-        <p className="text-xs font-bold truncate text-zinc-800" title={item.file.name}>{item.file.name}</p>
+        <p className="text-xs font-bold truncate text-zinc-800" title={displayName}>{displayName}</p>
         <div className="text-[10px] text-zinc-400 mt-1 flex items-center gap-2">
           <span>{formatBytes(item.file.size)}</span>
           {item.status === 'pending' && <span className="text-zinc-500">• Waiting</span>}
@@ -53,10 +56,43 @@ export function QueueItemCard({ item, onRemove, isConverting }: { item: QueueIte
 }
 
 export function QueueList({ queue, onRemove, isConverting, onConvertAll, onClearAll }: QueueListProps) {
+  const [isZipping, setIsZipping] = useState(false);
+
   if (queue.length === 0) return null;
 
   const pendingCount = queue.filter(q => q.status === 'pending' || q.status === 'error').length;
   const doneCount = queue.filter(q => q.status === 'done').length;
+  const isAllProcessed = queue.length > 0 && queue.every(q => q.status === 'done' || q.status === 'error') && doneCount > 0;
+
+  const handleDownloadZip = async () => {
+    setIsZipping(true);
+    try {
+      const zip = new JSZip();
+      let hasFiles = false;
+
+      queue.forEach(item => {
+        if (item.status === 'done' && item.result) {
+          const base64Data = item.result.url.split(',')[1];
+          zip.file(item.result.name, base64Data, { base64: true });
+          hasFiles = true;
+        }
+      });
+
+      if (hasFiles) {
+        const content = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'LocalPic_Batch.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      console.error("Zipping failed", err);
+    } finally {
+      setIsZipping(false);
+    }
+  };
 
   return (
     <motion.div 
@@ -72,18 +108,28 @@ export function QueueList({ queue, onRemove, isConverting, onConvertAll, onClear
         <div className="flex items-center gap-2">
            <button 
              onClick={onClearAll}
-             disabled={isConverting}
+             disabled={isConverting || isZipping}
              className="px-3 py-1.5 text-xs font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-lg disabled:opacity-50 transition-colors"
            >
              Clear All
            </button>
-           <button
-             onClick={onConvertAll}
-             disabled={isConverting || pendingCount === 0}
-             className="px-4 py-1.5 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg disabled:opacity-50 shadow-sm flex items-center gap-2 transition-all active:scale-95"
-           >
-             {isConverting ? <><Loader2 className="w-3 h-3 animate-spin"/> Processing</> : 'Convert All'}
-           </button>
+           {isAllProcessed ? (
+             <button
+               onClick={handleDownloadZip}
+               disabled={isZipping}
+               className="px-4 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg disabled:opacity-50 shadow-sm flex items-center gap-2 transition-all active:scale-95"
+             >
+               {isZipping ? <><Loader2 className="w-3 h-3 animate-spin"/> Zipping...</> : <><Archive className="w-3 h-3"/> Download All (.zip)</>}
+             </button>
+           ) : (
+             <button
+               onClick={onConvertAll}
+               disabled={isConverting || pendingCount === 0}
+               className="px-4 py-1.5 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg disabled:opacity-50 shadow-sm flex items-center gap-2 transition-all active:scale-95"
+             >
+               {isConverting ? <><Loader2 className="w-3 h-3 animate-spin"/> Processing</> : 'Convert All'}
+             </button>
+           )}
         </div>
       </div>
       

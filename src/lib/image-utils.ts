@@ -7,7 +7,7 @@ export const formatBytes = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`
 }
 
-export const convertImage = async (file: File, format: 'jpeg' | 'webp' = 'jpeg'): Promise<{ url: string, name: string, size: number, originalSize: number }> => {
+export const convertImage = async (file: File, format: 'jpeg' | 'webp' = 'jpeg', customName?: string): Promise<{ url: string, name: string, size: number, originalSize: number }> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -36,7 +36,8 @@ export const convertImage = async (file: File, format: 'jpeg' | 'webp' = 'jpeg')
         const sizeInBytes = (base64Length * 3) / 4 - padding;
 
         const originalName = file.name.substring(0, file.name.lastIndexOf('.'));
-        const newName = `${originalName}-hasil.${format}`;
+        const baseOutputName = customName ? customName : `${originalName}-hasil`;
+        const newName = `${baseOutputName}.${format}`;
         
         resolve({ url: dataUrl, name: newName, size: sizeInBytes, originalSize: file.size });
       };

@@ -12,6 +12,7 @@ export type QueueItem = {
   status: 'pending' | 'converting' | 'done' | 'error';
   result?: { url: string; name: string; size: number; originalSize: number };
   error?: string;
+  customName?: string;
 };
 
 export default function App() {
@@ -20,6 +21,8 @@ export default function App() {
   const [globalError, setGlobalError] = useState<string | null>(null);
   const [convertedCount, setConvertedCount] = useState(0);
   const [outputFormat, setOutputFormat] = useState<'jpeg' | 'webp'>('jpeg');
+  const [customPrefix, setCustomPrefix] = useState('');
+  const [fileCounter, setFileCounter] = useState(1);
 
   // cleanup URLs when leaving
   useEffect(() => {
@@ -40,13 +43,20 @@ export default function App() {
       setGlobalError('Beberapa file diabaikan karena format tidak didukung.');
     }
 
-    const newItems: QueueItem[] = validFiles.map(f => ({
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7),
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-      status: 'pending'
-    }));
+    let currentCounter = fileCounter;
+    const newItems: QueueItem[] = validFiles.map((f) => {
+      const customName = customPrefix.trim() !== '' ? `${customPrefix.trim()}${currentCounter}` : undefined;
+      currentCounter++;
+      return {
+        id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(7),
+        file: f,
+        previewUrl: URL.createObjectURL(f),
+        status: 'pending',
+        customName
+      };
+    });
 
+    setFileCounter(currentCounter);
     setQueue(prev => [...prev, ...newItems]);
   };
 
@@ -61,7 +71,7 @@ export default function App() {
       
       try {
         await new Promise(res => setTimeout(res, 200)); // micro interaction
-        const converted = await convertImage(item.file, outputFormat);
+        const converted = await convertImage(item.file, outputFormat, item.customName);
         
         setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'done', result: converted } : q));
         setConvertedCount(prev => prev + 1);
@@ -85,6 +95,7 @@ export default function App() {
     queue.forEach(item => URL.revokeObjectURL(item.previewUrl));
     setQueue([]);
     setGlobalError(null);
+    setFileCounter(1);
   };
 
   return (
@@ -118,14 +129,24 @@ export default function App() {
                 <label className="text-sm font-medium">Output Format</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button 
+                    type="button"
                     onClick={() => setOutputFormat('jpeg')}
-                    className={`px-3 py-2 text-xs font-bold rounded shadow-sm transition-colors ${outputFormat === 'jpeg' ? 'bg-zinc-900 text-white' : 'bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-600'}`}
+                    className={`relative z-10 px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer ${
+                      outputFormat === 'jpeg' 
+                        ? 'bg-zinc-900 text-white hover:bg-zinc-800' 
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-900 hover:border-zinc-300'
+                    }`}
                   >
                     .JPEG
                   </button>
                   <button 
+                    type="button"
                     onClick={() => setOutputFormat('webp')}
-                    className={`px-3 py-2 text-xs font-bold rounded shadow-sm transition-colors ${outputFormat === 'webp' ? 'bg-zinc-900 text-white' : 'bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-600'}`}
+                    className={`relative z-10 px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer ${
+                      outputFormat === 'webp' 
+                        ? 'bg-zinc-900 text-white hover:bg-zinc-800' 
+                        : 'bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-900 hover:border-zinc-300'
+                    }`}
                   >
                     .WEBP
                   </button>
@@ -139,6 +160,19 @@ export default function App() {
                 <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden flex">
                   <div className="w-[92%] bg-zinc-900 h-full"></div>
                 </div>
+              </div>
+              <div className="space-y-2 mt-4 pt-4 border-t border-zinc-100">
+                <label className="text-sm font-medium">Custom File Prefix</label>
+                <input 
+                  type="text" 
+                  value={customPrefix}
+                  onChange={(e) => setCustomPrefix(e.target.value)}
+                  placeholder="e.g. KTP_"
+                  className="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 transition-all text-zinc-900 placeholder:text-zinc-400"
+                />
+                <p className="text-[10px] text-zinc-500 leading-tight">
+                  Jika diisi, file akan di-rename otomatis. (Cth: KTP_1, KTP_2)
+                </p>
               </div>
             </div>
           </div>
