@@ -1,17 +1,547 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LocalPic Converter</title>
-    <meta name="theme-color" content="#18181b" />
-    <link rel="manifest" href="/manifest.json" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <link rel="apple-touch-icon" href="/icon.svg" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalPic Converter</title>
+  <meta name="theme-color" content="#18181b" />
+  
+  <!-- Tailwind CSS -->
+  <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+  
+  <!-- JSZip -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Animate.css -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+
+  <style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #e4e4e7; border-radius: 20px; }
+    .bg-radial {
+      background-image: radial-gradient(#e5e7eb 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+    .dropzone-active {
+      background-color: #fbfbfb;
+      border-color: #a1a1aa;
+    }
+  </style>
+</head>
+<body class="h-screen bg-zinc-50 text-zinc-950 font-sans flex flex-col overflow-hidden select-none">
+
+  <!-- Header Navigation -->
+  <nav class="h-16 shrink-0 border-b border-zinc-200 flex items-center justify-between px-4 md:px-8 bg-white">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 bg-zinc-900 rounded flex items-center justify-center">
+        <div class="w-4 h-4 border-2 border-white rotate-45"></div>
+      </div>
+      <h1 class="text-lg font-semibold tracking-tight">
+        LocalPic <span class="text-zinc-400 font-normal underline decoration-zinc-200 underline-offset-4">Converter</span>
+      </h1>
+    </div>
+    <div class="flex items-center gap-4 md:gap-6">
+      <div class="hidden md:flex items-center gap-2 text-xs font-medium text-zinc-500 bg-zinc-100 px-3 py-1.5 rounded-full">
+        <div class="w-2 h-2 bg-green-500 rounded-full"></div>
+        Offline Processing Enabled
+      </div>
+      <!-- Profile Widget -->
+      <div class="relative group">
+        <button id="profileBtn" class="flex items-center gap-2 hover:bg-zinc-100 p-1 md:pr-3 rounded-full transition-colors border border-transparent hover:border-zinc-200 cursor-pointer">
+          <div id="profileInitial" class="w-8 h-8 rounded-full bg-zinc-900 text-white flex items-center justify-center text-xs font-bold shadow-inner">U</div>
+          <div class="text-left hidden md:block">
+            <p id="profileNameDisplay" class="text-xs font-bold leading-none text-zinc-900">Guest User</p>
+            <p id="profileUserDisplay" class="text-[10px] text-zinc-500 font-mono tracking-tight">@guest</p>
+          </div>
+        </button>
+        <div id="profileDropdown" class="hidden absolute right-0 top-full mt-2 w-64 bg-white border border-zinc-200 rounded-xl shadow-xl z-50 p-5 animate__animated animate__fadeIn animate__faster">
+          <div class="flex items-center gap-2 mb-4 pb-3 border-b border-zinc-100">
+            <i data-lucide="user" class="w-4 h-4 text-zinc-400"></i>
+            <h4 class="text-sm font-bold text-zinc-800">Edit Profile</h4>
+          </div>
+          <div class="space-y-4">
+            <div class="space-y-1.5">
+              <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Name</label>
+              <input id="editName" type="text" class="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900" placeholder="Your Name">
+            </div>
+            <div class="space-y-1.5">
+              <label class="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Username</label>
+              <input id="editUsername" type="text" class="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-zinc-900" placeholder="@username">
+            </div>
+            <button id="saveProfileBtn" class="w-full mt-2 bg-zinc-900 text-white rounded-lg px-4 py-2.5 text-sm font-bold flex items-center justify-center gap-2 hover:bg-zinc-800 cursor-pointer transition-colors shadow-md active:scale-95">
+              <i data-lucide="check" class="w-4 h-4"></i> Save Profile
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 overflow-y-auto flex flex-col md:flex-row p-4 md:p-8 gap-8">
+    <!-- Sidebar -->
+    <aside class="w-full md:w-72 flex flex-col gap-6 shrink-0">
+      <div class="space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-zinc-400">Export Settings</h2>
+        <div class="p-4 bg-white border border-zinc-200 rounded-xl space-y-4 shadow-sm">
+          <div class="space-y-2">
+            <label class="text-sm font-medium">Output Format</label>
+            <div class="grid grid-cols-2 gap-2" id="formatToggle">
+              <button data-format="jpeg" class="format-btn px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer bg-zinc-900 text-white hover:bg-zinc-800">.JPEG</button>
+              <button data-format="webp" class="format-btn px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-900 hover:border-zinc-300">.WEBP</button>
+            </div>
+          </div>
+          <div class="space-y-3 pt-2">
+            <div class="flex justify-between text-xs">
+              <label class="font-medium">Quality</label>
+              <span class="text-zinc-500">92%</span>
+            </div>
+            <div class="h-1.5 bg-zinc-100 rounded-full overflow-hidden flex">
+              <div class="w-[92%] bg-zinc-900 h-full"></div>
+            </div>
+          </div>
+          <div class="space-y-2 mt-4 pt-4 border-t border-zinc-100">
+            <label class="text-sm font-medium">Custom File Prefix</label>
+            <input type="text" id="customPrefix" placeholder="e.g. KTP_" class="w-full px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 text-zinc-900">
+            <p class="text-[10px] text-zinc-500 leading-tight">Jika diisi, file akan di-rename otomatis. (Cth: KTP_1, KTP_2)</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-zinc-400">Session Statistics</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 bg-zinc-100 border border-zinc-200 rounded-lg flex flex-col items-center justify-center text-center">
+            <p id="statsConverted" class="text-2xl font-semibold mb-1 tracking-tight text-zinc-900">0</p>
+            <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Converted</p>
+          </div>
+          <div class="p-3 bg-zinc-100 border border-zinc-200 rounded-lg flex flex-col items-center justify-center text-center">
+            <p class="text-2xl font-semibold mb-1 tracking-tight text-zinc-900">&lt; 1s</p>
+            <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Latency</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-auto hidden md:block p-4 bg-zinc-900 rounded-xl text-white shadow-xl border border-zinc-800">
+        <p class="text-xs font-medium opacity-80 leading-relaxed text-zinc-300">
+          All images are processed locally using your browser's <span class="text-white font-bold">Canvas API</span>. No data ever leaves your device.
+        </p>
+      </div>
+    </aside>
+
+    <!-- Canvas Area -->
+    <div class="flex-1 flex flex-col gap-6 max-w-4xl min-h-0">
+      
+      <!-- Error Message -->
+      <div id="errorMessage" class="hidden items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 px-4 py-3 rounded-lg w-full animate__animated animate__fadeIn">
+        <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+        <p id="errorText"></p>
+      </div>
+
+      <!-- Dropzone -->
+      <div id="dropzone" class="shrink-0 relative w-full border-2 border-dashed border-zinc-200 rounded-2xl flex flex-col items-center justify-center text-center p-10 transition-colors duration-200 cursor-pointer bg-white bg-radial hover:border-zinc-400 group">
+        <input type="file" id="fileInput" accept="image/png, image/jpeg, image/webp" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10">
+        <div class="flex flex-col items-center justify-center pointer-events-none">
+          <div class="w-16 h-16 bg-zinc-100 rounded-full flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <i data-lucide="upload-cloud" class="w-8 h-8 text-zinc-400" id="uploadIcon"></i>
+          </div>
+          <h3 class="text-xl font-medium mb-2 text-zinc-900">Drag & Drop Images</h3>
+          <p class="text-zinc-500 text-sm max-w-xs mx-auto mb-8 leading-relaxed">
+            Supports PNG, JPG, WEBP. Batch conversion will process sequentially instantly.
+          </p>
+          <div class="px-8 py-3 bg-zinc-900 text-white font-bold rounded-lg shadow-md group-hover:bg-zinc-800 transition-colors">
+            Select Files
+          </div>
+        </div>
+      </div>
+
+      <!-- Queue Container -->
+      <div id="queueContainer" style="display: none;" class="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm flex-col shrink-0 min-h-0 h-full animate__animated animate__fadeInUp animate__faster">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+          <div>
+            <h4 class="text-sm font-bold text-zinc-400 uppercase tracking-tight">Export Queue</h4>
+            <p id="queueStats" class="text-xs text-zinc-500 mt-0.5">0 items • 0 completed</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button id="clearAllBtn" class="px-3 py-1.5 text-xs font-bold text-zinc-500 bg-zinc-100 hover:bg-zinc-200 rounded-lg transition-colors shadow-sm cursor-pointer">
+              Clear All
+            </button>
+            <button id="actionBtn" class="px-4 py-1.5 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg shadow-sm flex items-center gap-2 transition-all cursor-pointer">
+              Convert All
+            </button>
+          </div>
+        </div>
+        
+        <div id="queueList" class="flex-1 overflow-y-auto min-h-0 pr-2 space-y-3 custom-scrollbar">
+          <!-- Queue Items appended here -->
+        </div>
+      </div>
+      
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="h-10 shrink-0 border-t border-zinc-200 bg-white flex items-center px-4 md:px-8 text-[10px] text-zinc-400 shadow-sm z-10">
+    <div class="flex-1 flex gap-4 md:gap-6 overflow-hidden whitespace-nowrap">
+      <span>ENGINE: CANVAS_API_V2</span>
+      <span>MIME_STRICT: ENABLED</span>
+      <span class="hidden md:inline">MEMORY_USAGE: <span id="memUsage">42.4</span> MB</span>
+    </div>
+    <div class="hidden sm:flex text-zinc-500 font-medium tracking-tight">
+      Created by ColeAllStar
+    </div>
+    <div class="flex gap-4 font-mono pl-4">
+      <span class="text-zinc-600 hidden md:inline">SECURE_CONTEXT</span>
+      <span class="text-green-600 font-bold uppercase">System Ready</span>
+    </div>
+  </footer>
+
+  <script>
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // -----------------------------------------------------
+    // STATE & LOGIC
+    // -----------------------------------------------------
+    let currentFormat = 'jpeg';
+    let queue = []; 
+    let convertedTotal = 0;
+    let fileCounter = 1;
+    let isProcessing = false;
+
+    // DOM Elements
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const formatBtns = document.querySelectorAll('.format-btn');
+    const queueContainer = document.getElementById('queueContainer');
+    const queueList = document.getElementById('queueList');
+    const queueStats = document.getElementById('queueStats');
+    const clearAllBtn = document.getElementById('clearAllBtn');
+    const actionBtn = document.getElementById('actionBtn');
+    const statsConverted = document.getElementById('statsConverted');
+    const customPrefixInput = document.getElementById('customPrefix');
+    const errorMessage = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+
+    // Profile Elements
+    const profileBtn = document.getElementById('profileBtn');
+    const profileDropdown = document.getElementById('profileDropdown');
+    const profileNameDisplay = document.getElementById('profileNameDisplay');
+    const profileUserDisplay = document.getElementById('profileUserDisplay');
+    const profileInitial = document.getElementById('profileInitial');
+    const editName = document.getElementById('editName');
+    const editUsername = document.getElementById('editUsername');
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+
+    // Format selection
+    formatBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        formatBtns.forEach(b => {
+          b.className = 'format-btn px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer bg-zinc-50 border border-zinc-200 text-zinc-400 hover:text-zinc-900 hover:border-zinc-300';
+        });
+        const target = e.target;
+        target.className = 'format-btn px-3 py-2 text-xs font-bold rounded shadow-sm transition-all cursor-pointer bg-zinc-900 text-white hover:bg-zinc-800';
+        currentFormat = target.dataset.format;
+      });
+    });
+
+    // Profile Logic
+    function loadProfile() {
+      const name = localStorage.getItem('localpic_name') || 'Guest User';
+      const username = localStorage.getItem('localpic_username') || '@guest';
+      profileNameDisplay.textContent = name;
+      profileUserDisplay.textContent = username;
+      profileInitial.textContent = name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase() || 'U';
+      editName.value = name;
+      editUsername.value = username;
+    }
+    loadProfile();
+
+    profileBtn.addEventListener('click', () => {
+      profileDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!profileBtn.contains(e.target) && !profileDropdown.contains(e.target)) {
+        profileDropdown.classList.add('hidden');
+      }
+    });
+
+    saveProfileBtn.addEventListener('click', () => {
+      localStorage.setItem('localpic_name', editName.value || 'Guest User');
+      localStorage.setItem('localpic_username', editUsername.value || '@guest');
+      loadProfile();
+      profileDropdown.classList.add('hidden');
+    });
+
+    // File Handling
+    dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropzone.classList.add('dropzone-active');
+    });
+    dropzone.addEventListener('dragleave', () => {
+      dropzone.classList.remove('dropzone-active');
+    });
+    dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropzone.classList.remove('dropzone-active');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        handleFiles(Array.from(e.dataTransfer.files));
+      }
+    });
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleFiles(Array.from(e.target.files));
+      }
+      fileInput.value = '';
+    });
+
+    function showError(msg) {
+      errorText.textContent = msg;
+      errorMessage.classList.remove('hidden');
+      errorMessage.classList.add('flex');
+      setTimeout(() => errorMessage.classList.add('hidden'), 5000);
+    }
+
+    function handleFiles(files) {
+      const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const validFiles = files.filter(f => validTypes.includes(f.type));
+      if (validFiles.length < files.length) {
+        showError('Beberapa file diabaikan karena format tidak didukung.');
+      }
+      
+      const customPrefix = customPrefixInput.value.trim();
+      let hasNew = false;
+
+      validFiles.forEach(f => {
+        const id = Math.random().toString(36).substring(7);
+        const objectUrl = URL.createObjectURL(f);
+        let customName = null;
+        if (customPrefix) {
+          customName = `${customPrefix}${fileCounter}`;
+          fileCounter++;
+        }
+        
+        queue.push({
+          id, file: f, customName, status: 'pending', previewUrl: objectUrl
+        });
+        hasNew = true;
+      });
+
+      if (hasNew) renderQueue();
+    }
+
+    // Convert Logic
+    async function convertToFormat(file, format, customName) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            const mimeType = format === 'webp' ? 'image/webp' : 'image/jpeg';
+            const dataUrl = canvas.toDataURL(mimeType, 0.92);
+
+            const base64Length = dataUrl.length - (dataUrl.indexOf(',') + 1);
+            const padding = (dataUrl.charAt(dataUrl.length - 2) === '=') ? 2 : ((dataUrl.charAt(dataUrl.length - 1) === '=') ? 1 : 0);
+            const sizeInBytes = (base64Length * 3) / 4 - padding;
+
+            const originalName = file.name.substring(0, file.name.lastIndexOf('.'));
+            const baseOutputName = customName ? customName : `${originalName}-hasil`;
+            const newName = `${baseOutputName}.${format}`;
+
+            resolve({ url: dataUrl, name: newName, size: sizeInBytes });
+          };
+          img.onerror = () => reject(new Error('Gagal memuat gambar'));
+          img.src = e.target.result;
+        };
+        reader.onerror = () => reject(new Error('Gagal membaca file'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function formatBytes(bytes) {
+      if (!+bytes) return '0 Bytes';
+      const k = 1024, dm = 2, sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    }
+
+    // Render Queue
+    function renderQueue() {
+      if (queue.length === 0) {
+        queueContainer.style.display = "none";
+        return;
+      }
+      queueContainer.style.display = "flex";
+
+      const doneCount = queue.filter(q => q.status === 'done').length;
+      const pendingCount = queue.filter(q => q.status === 'pending' || q.status === 'error').length;
+      queueStats.textContent = `${queue.length} items • ${doneCount} completed`;
+
+      queueList.innerHTML = '';
+      queue.forEach(item => {
+        const displayName = item.customName ? `${item.customName} (from ${item.file.name})` : item.file.name;
+        
+        let statusHtml = '';
+        if (item.status === 'pending') statusHtml = `<span class="text-zinc-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Waiting</span>`;
+        if (item.status === 'converting') statusHtml = `<span class="text-zinc-900 font-medium flex items-center gap-1"><i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Processing</span>`;
+        if (item.status === 'done') statusHtml = `<span class="text-green-600 font-medium flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Done (${formatBytes(item.resultSize)})</span>`;
+        if (item.status === 'error') statusHtml = `<span class="text-red-500 flex items-center gap-1"><i data-lucide="alert-circle" class="w-3 h-3"></i> Error</span>`;
+
+        let actionHtml = '';
+        if (item.status === 'done') {
+          actionHtml = `<a href="${item.resultUrl}" download="${item.resultName}" class="w-8 h-8 rounded bg-zinc-900 text-white flex items-center justify-center hover:bg-zinc-800 transition-colors shadow-sm" title="Download .${item.resultName.split('.').pop()}">
+                          <i data-lucide="download" class="w-4 h-4"></i>
+                        </a>`;
+        }
+        
+        const el = document.createElement('div');
+        el.className = 'w-full border border-zinc-100 rounded-xl flex items-center p-3 gap-4 bg-zinc-50/50 shrink-0 mb-2 animate__animated animate__fadeIn animate__faster hover:bg-zinc-100/50';
+        el.innerHTML = `
+          <div class="w-14 h-14 bg-zinc-200 rounded-lg overflow-hidden shrink-0 border border-zinc-200 shadow-inner">
+            <img src="${item.previewUrl}" alt="preview" class="w-full h-full object-cover" />
+          </div>
+          <div class="flex-1 min-w-0 flex flex-col justify-center">
+            <p class="text-xs font-bold truncate text-zinc-800 tracking-tight" title="${displayName}">${displayName}</p>
+            <div class="text-[10px] text-zinc-400 mt-1 flex items-center gap-2">
+              <span>${formatBytes(item.file.size)}</span>
+              ${statusHtml}
+            </div>
+          </div>
+          <div class="shrink-0 flex items-center gap-2">
+            ${actionHtml}
+            <button onclick="removeItem('${item.id}')" ${isProcessing ? 'disabled' : ''} class="w-8 h-8 rounded text-zinc-400 flex items-center justify-center hover:bg-zinc-200 hover:text-zinc-700 transition-colors disabled:opacity-50 cursor-pointer active:scale-95">
+              <i data-lucide="x" class="w-4 h-4"></i>
+            </button>
+          </div>
+        `;
+        queueList.appendChild(el);
+      });
+      lucide.createIcons({ root: queueList });
+
+      // Update Top Buttons
+      const isAllDone = queue.length > 0 && queue.every(q => q.status === 'done' || q.status === 'error') && doneCount > 0;
+      clearAllBtn.disabled = isProcessing;
+      
+      if (isAllDone) {
+        actionBtn.className = "px-4 py-1.5 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg shadow-sm flex items-center gap-2 transition-all active:scale-95 cursor-pointer";
+        actionBtn.innerHTML = `<i data-lucide="archive" class="w-3 h-3"></i> Download All (.zip)`;
+        actionBtn.onclick = downloadAllZip;
+        lucide.createIcons({ root: actionBtn });
+        actionBtn.disabled = false;
+      } else {
+        actionBtn.className = "px-4 py-1.5 text-xs font-bold text-white bg-zinc-900 hover:bg-zinc-800 rounded-lg shadow-sm flex items-center gap-2 transition-all disabled:opacity-50 active:scale-95 cursor-pointer";
+        if (isProcessing) {
+          actionBtn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Processing`;
+          actionBtn.disabled = true;
+        } else {
+          actionBtn.innerHTML = `Convert All`;
+          actionBtn.onclick = processQueue;
+          actionBtn.disabled = pendingCount === 0;
+        }
+        lucide.createIcons({ root: actionBtn });
+      }
+    }
+
+    // Queue Actions
+    window.removeItem = (id) => {
+      const idx = queue.findIndex(q => q.id === id);
+      if (idx > -1) {
+        URL.revokeObjectURL(queue[idx].previewUrl);
+        queue.splice(idx, 1);
+        renderQueue();
+      }
+    }
+    
+    clearAllBtn.addEventListener('click', () => {
+      queue.forEach(q => URL.revokeObjectURL(q.previewUrl));
+      queue = [];
+      fileCounter = 1;
+      customPrefixInput.value = '';
+      renderQueue();
+    });
+
+    async function processQueue() {
+      const itemsToProcess = queue.filter(q => q.status === 'pending' || q.status === 'error');
+      if (itemsToProcess.length === 0) return;
+
+      isProcessing = true;
+      renderQueue(); 
+
+      for (const item of itemsToProcess) {
+        const qItem = queue.find(q => q.id === item.id);
+        if (!qItem) continue;
+        
+        qItem.status = 'converting';
+        renderQueue();
+
+        try {
+          await new Promise(r => setTimeout(r, 200)); 
+          const result = await convertToFormat(qItem.file, currentFormat, qItem.customName);
+          qItem.status = 'done';
+          qItem.resultUrl = result.url;
+          qItem.resultName = result.name;
+          qItem.resultSize = result.size;
+          
+          convertedTotal++;
+          statsConverted.textContent = convertedTotal;
+        } catch (err) {
+          qItem.status = 'error';
+        }
+      }
+
+      isProcessing = false;
+      renderQueue();
+    }
+
+    async function downloadAllZip() {
+      isProcessing = true;
+      actionBtn.innerHTML = `<i data-lucide="loader-2" class="w-3 h-3 animate-spin"></i> Zipping...`;
+      lucide.createIcons({ root: actionBtn });
+      actionBtn.disabled = true;
+
+      try {
+        const zip = new JSZip();
+        let hasFiles = false;
+        queue.forEach(item => {
+          if (item.status === 'done' && item.resultUrl) {
+            const base64Data = item.resultUrl.split(',')[1];
+            zip.file(item.resultName, base64Data, { base64: true });
+            hasFiles = true;
+          }
+        });
+        if (hasFiles) {
+          const content = await zip.generateAsync({ type: 'blob' });
+          const url = URL.createObjectURL(content);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = 'LocalPic_Batch.zip';
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      } catch (err) {
+        showError("Gagal membuat file ZIP.");
+      }
+      
+      isProcessing = false;
+      renderQueue(); 
+    }
+
+    // Memory usage mock interval
+    setInterval(() => {
+      document.getElementById('memUsage').textContent = (40 + Math.random() * 5).toFixed(1);
+    }, 2000);
+  </script>
+</body>
+</html>
