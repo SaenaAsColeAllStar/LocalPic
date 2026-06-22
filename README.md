@@ -1,20 +1,123 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# LocalPic Converter
 
-# Run and deploy your AI Studio app
+Fast, privacy-first image conversion tool that runs entirely in the browser.
 
-This contains everything you need to run your app locally.
+Convert PNG, JPG, and other image formats into optimized JPEG files without uploading any data to external servers.
 
-View your app in AI Studio: https://ai.studio/apps/167a1815-2122-4b36-a712-d41df75471ad
+## Live Demo
 
-## Run Locally
+Add your deployed URL here.
 
-**Prerequisites:**  Node.js
+---
 
+## Features
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Client-side image conversion
+- PNG → JPEG conversion
+- JPG → JPEG conversion
+- No server processing required
+- Privacy-focused workflow
+- Fast browser-based processing
+- Responsive interface
+- Mobile-friendly experience
+
+---
+
+## Why LocalPic?
+
+Most online image converters upload user files to remote servers.
+
+LocalPic processes images directly inside the browser, meaning:
+
+- Faster conversion
+- Better privacy
+- No file uploads
+- Reduced bandwidth usage
+- Works entirely on the client side
+
+---
+
+## Tech Stack
+
+### Frontend
+
+- React
+- TypeScript
+- Vite
+
+### Styling
+
+- Tailwind CSS
+
+### AI Integration
+
+- Google Gemini SDK
+
+### Deployment
+
+- Static Hosting
+- Cloudflare Pages
+- Vercel
+- Netlify
+
+---
+
+## Project Architecture
+
+```text
+User Upload
+     │
+     ▼
+Browser Processing
+     │
+     ▼
+Image Conversion
+     │
+     ▼
+JPEG Output
+```
+
+All image processing is performed locally inside the user's browser.
+
+No image data is transmitted to external servers.
+
+---
+
+## Use Cases
+
+- Website image optimization
+- Content creation workflows
+- Digital marketing assets
+- Portfolio image preparation
+- Social media content
+
+---
+
+## Installation
+
+```bash
+npm install
+npm run dev
+```
+
+---
+
+## Environment Variables
+
+```env
+GEMINI_API_KEY=your_api_key
+```
+
+---
+
+## Author
+
+Saepul Husna
+
+Frontend Developer & AI-Assisted Full Stack Product Builder
+
+Portfolio:
+https://porto.ctos.web.id
+
+GitHub:
+https://github.com/SaenaAsColeAllStar
